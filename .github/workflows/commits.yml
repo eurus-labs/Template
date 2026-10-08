@@ -31,6 +31,9 @@ jobs:
         run: |
           pattern='^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)(\([a-z0-9][a-z0-9._/-]*\))?!?: [^[:space:]](.*[^.[:space:]])?$'
           attribution='^co-authored-by:.*(claude|copilot|codex|chatgpt|anthropic|openai)|^claude-session:|generated[- ](with|by):? .*(claude|copilot|codex)|claude\.ai/code'
+          # The human user's GitHub no-reply address; the repository is public, so a
+          # private email must never land in history.
+          noreply='^[0-9]+\+[A-Za-z0-9-]+@users\.noreply\.github\.com$'
           status=0
 
           # Here-strings, not pipes: Actions runs this with pipefail, and grep -q exiting
@@ -55,6 +58,18 @@ jobs:
             check_subject "Commit ${sha:0:7}" "$(git log -1 --format=%s "$sha")"
             if grep -Eiq "$attribution" <<< "$(git log -1 --format=%B "$sha")"; then
               echo "::error::Commit ${sha:0:7} carries AI or tool attribution; reword it without the trailer or footer."
+              status=1
+            fi
+            author_email=$(git log -1 --format=%ae "$sha")
+            committer_email=$(git log -1 --format=%ce "$sha")
+            if ! grep -Eq "$noreply" <<< "$author_email"; then
+              echo "::error::Commit ${sha:0:7} author email is not a GitHub no-reply address (<id>+<login>@users.noreply.github.com)."
+              status=1
+            fi
+            # GitHub itself commits web edits as noreply@github.com; anything else must
+            # be the author.
+            if [ "$committer_email" != "$author_email" ] && [ "$committer_email" != noreply@github.com ]; then
+              echo "::error::Commit ${sha:0:7} committer email differs from the author's; both must be the same user."
               status=1
             fi
           done
