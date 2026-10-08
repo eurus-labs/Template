@@ -59,3 +59,20 @@ jobs:
           done
 
           exit "$status"
+
+  # The one check a branch ruleset should require. Add every new job (build, test)
+  # to needs; the check name stays the same. always(): a skipped required check
+  # counts as passing, so this job must run and fail when anything above fails.
+  verify:
+    if: always()
+    needs: [conventional-commits]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Every required job passed or was skipped for a bot
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "results: $RESULTS"
+          for result in $RESULTS; do
+            case "$result" in success|skipped) ;; *) exit 1 ;; esac
+          done
