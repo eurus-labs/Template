@@ -11,8 +11,9 @@ permissions:
 
 jobs:
   conventional-commits:
-    # Dependabot writes its own titles, which can run past 72 characters.
-    if: github.event.pull_request.user.type != 'Bot'
+    # Dependabot writes its own titles, which can run past 72 characters. Only it is
+    # exempt: any other bot or app is checked like a person.
+    if: github.event.pull_request.user.login != 'dependabot[bot]'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -29,7 +30,7 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           pattern='^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)(\([a-z0-9][a-z0-9._/-]*\))?!?: [^[:space:]](.*[^.[:space:]])?$'
-          attribution='^co-authored-by:.*(claude|copilot|codex|chatgpt|anthropic|openai)|^claude-session:|generated (with|by) .*(claude|copilot|codex)|claude\.ai/code'
+          attribution='^co-authored-by:.*(claude|copilot|codex|chatgpt|anthropic|openai)|^claude-session:|generated[- ](with|by):? .*(claude|copilot|codex)|claude\.ai/code'
           status=0
 
           # Here-strings, not pipes: Actions runs this with pipefail, and grep -q exiting
@@ -45,8 +46,8 @@ jobs:
           }
 
           check_subject "The pull request title" "$PR_TITLE"
-          if grep -Eiq "$attribution" <<< "$PR_BODY"; then
-            echo "::error::The pull request description carries AI or tool attribution; remove it."
+          if grep -Eiq "$attribution" <<< "$PR_TITLE"$'\n'"$PR_BODY"; then
+            echo "::error::The pull request title or description carries AI or tool attribution; remove it."
             status=1
           fi
 
